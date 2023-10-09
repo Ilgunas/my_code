@@ -1,0 +1,288 @@
+--DATA EXPLORATION
+SELECT DISTINCT user_type, COUNT(user_type) AS no_of_user_type
+FROM `tgtask.tgdataset`
+GROUP BY user_type;
+
+
+SELECT DISTINCT from_country, COUNT(from_country) AS no_of_from_country
+FROM `tgtask.tgdataset`
+GROUP BY from_country;
+
+
+SELECT DISTINCT to_country, COUNT(to_country) AS no_of_to_country
+FROM `tgtask.tgdataset`
+GROUP BY to_country;
+
+
+SELECT DISTINCT transaction_hub, COUNT(transaction_hub) AS no_of_transaction_hub
+FROM `tgtask.tgdataset`
+GROUP BY transaction_hub;
+
+
+SELECT DISTINCT payment_platform, COUNT(payment_platform) AS no_of_payment_platform
+FROM `tgtask.tgdataset`
+GROUP BY payment_platform;
+
+
+SELECT DISTINCT delivery_option, COUNT(delivery_option) AS no_of_delivery_option
+FROM `tgtask.tgdataset`
+GROUP BY delivery_option;
+
+
+SELECT DISTINCT payment_option, COUNT(payment_option) AS no_of_payment_option
+FROM `tgtask.tgdataset`
+GROUP BY payment_option;
+
+
+SELECT DISTINCT is_first_transaction, COUNT(is_first_transaction) AS no_of_is_first_transaction
+FROM `tgtask.tgdataset`
+GROUP BY is_first_transaction;
+
+
+SELECT DISTINCT registration_platform, COUNT(registration_platform) AS no_of_registration_platform
+FROM `tgtask.tgdataset`
+GROUP BY registration_platform;
+
+
+SELECT DISTINCT is_referred_customer, COUNT(is_referred_customer) AS no_of_is_referred_customer
+FROM `tgtask.tgdataset`
+GROUP BY is_referred_customer;
+
+
+-- Check for duplicates 
+SELECT COUNT(transaction_id) - COUNT(DISTINCT transaction_id) AS duplicate_rows
+FROM `tgtask.tgdataset`
+
+
+-- Check for wrong data
+SELECT *
+FROM`tgtask.tgdataset`
+WHERE transaction_id <0 OR 
+payment_amount <0 OR 
+received_amount<0 OR
+payment_amount_in_gbp <0 OR
+revenue_in_gbp<0 OR
+revenue_in_multi_ccy <0 OR
+fee <0 OR
+fee_in_gbp <0 OR
+delivery_option_fee <0 OR 
+delivery_option_fee_in_gbp <0 OR 
+payment_option_fee <0 OR 
+payment_option_fee_in_gbp <0
+
+
+-- Check for null values
+SELECT COUNT(*) - COUNT(user_id) AS user_id,
+ COUNT(*) - COUNT(transaction_id) AS transaction_id,
+ COUNT(*) - COUNT(from_country) AS from_country,
+ COUNT(*) - COUNT(to_country) AS to_country,
+ COUNT(*) - COUNT(transaction_hub) AS transaction_hub,
+ COUNT(*) - COUNT(from_currency) AS from_currency,
+ COUNT(*) - COUNT(to_currency) AS to_currency,
+ COUNT(*) - COUNT(payment_amount) AS payment_amount,
+ COUNT(*) - COUNT(received_amount) AS received_amount,
+ COUNT(*) - COUNT(mid_market_rate) AS mid_market_rate,
+ COUNT(*) - COUNT(mid_market_amount) AS mid_market_amount,
+ COUNT(*) - COUNT(fx_rate) AS fx_rate,
+ COUNT(*) - COUNT(fx_rate_to_gbp) AS fx_rate_to_gbp,
+ COUNT(*) - COUNT(payment_amount_in_gbp) AS payment_amount_in_gbp,
+ COUNT(*) - COUNT(revenue_in_gbp) AS revenue_in_gbp,
+ COUNT(*) - COUNT(revenue_in_multi_ccy) AS revenue_in_multi_ccy,
+ COUNT(*) - COUNT(delivery_option_fee) AS delivery_option_fee,
+ COUNT(*) - COUNT(delivery_option_fee_in_gbp) AS delivery_option_fee_in_gbp,
+ COUNT(*) - COUNT(payment_option_fee) payment_option_fee,
+ COUNT(*) - COUNT(payment_option_fee_in_gbp) AS payment_option_fee_in_gbp,
+ COUNT(*) - COUNT(fee) AS fee,
+ COUNT(*) - COUNT(fee_in_gbp) AS fee_in_gbp,
+ COUNT(*) - COUNT(payment_platform) AS payment_platform,
+ COUNT(*) - COUNT(delivery_option) AS delivery_option,
+ COUNT(*) - COUNT(payment_option) AS payment_option,
+ COUNT(*) - COUNT(is_first_transaction) AS is_first_transaction,
+ COUNT(*) - COUNT(transaction_created_at) AS transaction_created_at,
+ COUNT(*) - COUNT(language) AS language,
+ COUNT(*) - COUNT(user_type) AS user_type,
+ COUNT(*) - COUNT(registration_platform) AS registration_platform,
+ COUNT(*) - COUNT(is_referred_customer) AS is_referred_customer,
+ COUNT(*) - COUNT(user_registration_date) AS user_registration_date,
+FROM `tgtask.tgdataset` 
+--delivery_option_fee, delivery_option_fee_in_gbp, payment_option_fee, payment_option_fee_in_gbp 1489603 lines with null values; payment option 163 lines with null values (coincides with null valued colums from previous)
+
+
+
+--DATA CLENING AND PREPARATION
+-- droping lines with null values + corridor column creation
+CREATE TABLE `tgtask.analysis_data` AS
+SELECT user_id, transaction_id, from_country, to_country, CONCAT(from_country, '_', to_country) AS corridor, transaction_hub, from_currency, to_currency, payment_amount, received_amount, mid_market_rate, mid_market_amount, fx_rate, fx_rate_to_gbp, payment_amount_in_gbp, revenue_in_gbp, revenue_in_multi_ccy, delivery_option_fee, delivery_option_fee_in_gbp, payment_option_fee, payment_option_fee_in_gbp, fee, fee_in_gbp, payment_platform, delivery_option, payment_option, is_first_transaction, transaction_created_at, language, user_type, registration_platform, is_referred_customer, user_registration_date
+FROM `tgtask.tgdataset`
+WHERE 
+delivery_option_fee IS NOT NULL AND
+delivery_option_fee_in_gbp IS NOT NULL AND
+payment_option_fee IS NOT NULL AND
+payment_option_fee_in_gbp IS NOT NULL AND
+payment_option IS NOT NULL
+
+-- Check if clean
+SELECT COUNT(transaction_id) AS total_lines_raw
+FROM `tgtask.tgdataset`
+
+SELECT COUNT(transaction_id) AS total_lines_cleaned
+FROM `tgtask.analysis_data` --dropped 1489603 lines with NULL
+
+
+
+--TOP3 Corridors analysis
+--Cleaned data
+--Revenue
+SELECT corridor, SUM(revenue_in_gbp) AS total_revenue
+FROM`tgtask.analysis_data`
+GROUP BY corridor
+ORDER BY SUM(revenue_in_gbp) DESC
+LIMIT 5
+
+--Trx ammount
+SELECT corridor, COUNT(transaction_id) AS no_of_transactions, 
+FROM`tgtask.analysis_data`
+GROUP BY corridor
+ORDER BY COUNT(transaction_id) DESC
+LIMIT 5
+
+--Transfered in GBP
+SELECT corridor, SUM(payment_amount_in_gbp) AS gbp_transfered
+FROM`tgtask.analysis_data`
+GROUP BY corridor
+ORDER BY SUM(payment_amount_in_gbp) DESC
+LIMIT 5
+
+--RAW data
+--Revenue
+SELECT CONCAT(from_country, '_', to_country) AS corridor, SUM(revenue_in_gbp) AS total_revenue
+FROM`tgtask.tgdataset`
+GROUP BY corridor
+ORDER BY SUM(revenue_in_gbp) DESC
+LIMIT 5
+
+--Trx ammount
+SELECT CONCAT(from_country, '_', to_country) AS corridor, COUNT(transaction_id) AS no_of_transactions
+FROM`tgtask.tgdataset`
+GROUP BY corridor
+ORDER BY COUNT(transaction_id) DESC
+LIMIT 5
+
+--Transfered in GBP
+SELECT CONCAT(from_country, '_', to_country) AS corridor, SUM(payment_amount_in_gbp) AS gbp_transfered
+FROM`tgtask.tgdataset`
+GROUP BY corridor
+ORDER BY SUM(payment_amount_in_gbp) DESC
+LIMIT 5
+
+
+--ANALYSIS
+--Money flow by
+
+--is_first_transaction
+SELECT EXTRACT(YEAR FROM transaction_created_at) AS year, EXTRACT(MONTH FROM transaction_created_at) AS month, SUM(payment_amount_in_gbp) AS gbp_transfered, is_first_transaction
+FROM `tgtask.analysis_data`
+WHERE corridor = 'United Kingdom_Lithuania'
+GROUP BY year, month, is_first_transaction
+ORDER BY year asc, month asc
+
+--is_referred_customer
+SELECT EXTRACT(YEAR FROM transaction_created_at) AS year, EXTRACT(MONTH FROM transaction_created_at) AS month, SUM(payment_amount_in_gbp) AS gbp_transfered, is_referred_customer
+FROM `tgtask.analysis_data`
+WHERE corridor = 'United Kingdom_Lithuania'
+GROUP BY year, month, is_referred_customer
+ORDER BY year asc, month asc
+
+--user_type
+SELECT EXTRACT(YEAR FROM transaction_created_at) AS year, EXTRACT(MONTH FROM transaction_created_at) AS month, SUM(payment_amount_in_gbp) AS gbp_transfered, user_type
+FROM `tgtask.analysis_data`
+WHERE corridor = 'United Kingdom_Lithuania'
+GROUP BY year, month, user_type
+ORDER BY year asc, month asc
+
+--language
+SELECT SUM(payment_amount_in_gbp) AS gbp_transfered, language
+FROM `tgtask.analysis_data`
+WHERE corridor = 'United Kingdom_Lithuania'
+GROUP BY  language
+ORDER BY gbp_transfered DESC
+
+--delivery option
+SELECT EXTRACT(YEAR FROM transaction_created_at) AS year, EXTRACT(MONTH FROM transaction_created_at) AS month, SUM(payment_amount_in_gbp) AS gbp_transfered, delivery_option
+FROM `tgtask.analysis_data`
+WHERE corridor = 'United Kingdom_Lithuania'
+GROUP BY year, month, delivery_option
+ORDER BY year asc, month asc
+
+--payment_option
+SELECT EXTRACT(YEAR FROM transaction_created_at) AS year, EXTRACT(MONTH FROM transaction_created_at) AS month, SUM(payment_amount_in_gbp) AS gbp_transfered, payment_option
+FROM `tgtask.analysis_data`
+WHERE corridor = 'United Kingdom_Lithuania'
+GROUP BY year, month, payment_option
+ORDER BY year asc, month asc
+
+--registration_platform
+SELECT EXTRACT(YEAR FROM transaction_created_at) AS year, EXTRACT(MONTH FROM transaction_created_at) AS month, SUM(payment_amount_in_gbp) AS gbp_transfered, registration_platform
+FROM `tgtask.analysis_data`
+WHERE corridor = 'United Kingdom_Lithuania'
+GROUP BY year, month, registration_platform
+ORDER BY year asc, month asc
+
+--payment platform
+SELECT EXTRACT(YEAR FROM transaction_created_at) AS year, EXTRACT(MONTH FROM transaction_created_at) AS month, SUM(payment_amount_in_gbp) AS gbp_transfered, payment_platform
+FROM `tgtask.analysis_data`
+WHERE corridor = 'United Kingdom_Lithuania'
+GROUP BY year, month, payment_platform
+ORDER BY year asc, month asc
+
+--day of month
+SELECT EXTRACT(DAY FROM transaction_created_at) AS day, SUM(payment_amount_in_gbp) AS gbp_transfered, user_type
+FROM`tgtask.analysis_data`
+WHERE corridor = 'United Kingdom_Lithuania'
+GROUP BY day, user_type
+ORDER BY day asc
+
+--day of week
+SELECT EXTRACT(DAYOFWEEK FROM transaction_created_at) AS day_of_week, SUM(payment_amount_in_gbp) AS gbp_transfered, user_type
+FROM`tgtask.analysis_data`
+WHERE corridor = 'United Kingdom_Lithuania'
+GROUP BY day_of_week, user_type
+ORDER BY day_of_week asc
+
+--hour
+SELECT EXTRACT(HOUR FROM transaction_created_at) AS HOUR,  SUM(payment_amount_in_gbp) AS gbp_transfered, user_type
+FROM`tgtask.analysis_data`
+WHERE corridor = 'United Kingdom_Lithuania'
+GROUP BY hour, user_type
+ORDER BY hour asc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
